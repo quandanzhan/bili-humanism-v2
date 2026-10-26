@@ -1,0 +1,20 @@
+{
+  "name": "standalone-v2",
+  "private": true,
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node --env-file=.env main.mjs",
+    "security:scan": "node scripts/security-audit.mjs",
+    "test:security": "node --test tests/secrets.test.mjs gateway/tests/redaction.test.mjs tests/security-audit.test.mjs"
+  },
+  "description": "bili-humanism 内核重构产物（多 AI 协作）",
+  "type": "module",
+  "dependencies": {
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "playwright": "1.49.1",
+    "nodemailer": "^6.9.16",
+    "qrcode": "^1.5.4"
+  }
+}

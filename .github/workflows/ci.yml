@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 语法与安全检查
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 入口语法检查
+        run: node --check main.mjs
+
+      - name: 密钥与脱敏测试
+        run: npm run test:security
+
+      - name: 源码敏感信息扫描
+        run: npm run security:scan -- --include-private
+
+# 说明：
+# - 跨模块回归 gateway/tests/isolated-regression.mjs 需要本地文件系统链接，
+#   仅在开发者本机执行，不放入共享 CI，避免把平台差异误判为代码缺陷。
+# - 本工作流不接触任何真实凭据：仓库不含 .env、运行数据或凭据文件。
+# - 扫描器为启发式检测，绿勾只代表本次范围无命中，不构成安全保证。

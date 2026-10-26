@@ -1,0 +1,22 @@
+* text=auto
+*.mjs text eol=lf
+*.js text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Defense in depth: export-ignore does not untrack files or clean Git history.
+/.tmp export-ignore
+/.workbuddy export-ignore
+/node_modules export-ignore
+/data export-ignore
+/legacy export-ignore
+/private export-ignore
+/.env export-ignore
+/config.json export-ignore
+/settings.json export-ignore
+/models.json export-ignore
+/bili-credential.json export-ignore
+/bili_credential.json export-ignore
+/outputs export-ignore

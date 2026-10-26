@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="color-scheme" content="dark" />
+<title>海棠控制台 · bili-humanism</title>
+<link rel="stylesheet" href="./console.css?v=20261023f" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌊</text></svg>" />
+</head>
+<body>
+
+<!-- 登录遮罩 -->
+<div class="login-mask" id="loginMask" hidden>
+  <form class="login-card" id="loginForm">
+    <div class="login-logo">🌊</div>
+    <h1>海棠控制台</h1>
+    <p class="login-sub">bili-humanism · 内核控制台</p>
+    <label>
+      <span>用户名</span>
+      <input id="loginUser" autocomplete="username" placeholder="AUTH_USER" required />
+    </label>
+    <label>
+      <span>密码</span>
+      <input id="loginPass" type="password" autocomplete="current-password" placeholder="AUTH_HASH 对应的密码" required />
+    </label>
+    <p class="login-err" id="loginErr" hidden></p>
+    <button class="btn btn-primary btn-block" type="submit" id="loginBtn">进入控制台</button>
+    <p class="login-hint">凭据来自服务端 <code>service.env</code> 的 AUTH_USER / AUTH_SALT / AUTH_HASH</p>
+  </form>
+</div>
+
+<!-- 顶栏 -->
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">🌊</span>
+    <div>
+      <h1>海棠控制台</h1>
+      <p>bili-humanism 内核 · 通道与对话管理</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="pills" id="pills">
+      <span class="pill" id="pillHealth"><i class="dot"></i>检测中</span>
+      <span class="pill" id="pillTools">工具 —</span>
+      <span class="pill" id="pillChannels">通道 —</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="btnRefresh" title="刷新全部数据">刷新</button>
+    <button class="btn btn-ghost btn-sm" id="btnLogout" title="清除本地凭据">退出</button>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- 左：模型通道 + 快速开始 -->
+  <div class="left-col">
+  <section class="card card-channels">
+    <div class="card-head">
+      <div>
+        <h2>模型通道</h2>
+        <p class="card-sub">自定义 AI 大模型接入点 · 数字越小越优先，对话按顺序自动降级</p>
+      </div>
+      <div class="card-actions">
+        <label class="switch-labeled" title="自动模式下按优先级自动挑选并降级">
+          <span>自动模式</span>
+          <span class="switch">
+            <input type="checkbox" id="autoToggle" checked />
+            <i></i>
+          </span>
+        </label>
+        <button class="btn btn-primary btn-sm" id="btnAddToggle">+ 添加通道</button>
+      </div>
+    </div>
+
+    <!-- 新增表单 -->
+    <form class="add-form" id="addForm" hidden>
+      <div class="grid-2">
+        <label><span>名称</span><input name="name" placeholder="例如 DeepSeek 主力" maxlength="40" /></label>
+        <label><span>模型 ID <b>*</b></span><input name="model" placeholder="例如 deepseek-chat" required maxlength="120" /></label>
+        <label class="span-2"><span>Base URL <b>*</b></span><input name="baseURL" placeholder="https://api.deepseek.com/v1" required /></label>
+        <label class="span-2"><span>API Key</span><input name="apiKey" type="password" placeholder="sk-..." autocomplete="off" /></label>
+        <label><span>优先级</span><input name="priority" type="number" placeholder="留空自动排到末位" /></label>
+        <label><span>备注</span><input name="note" placeholder="可选" maxlength="160" /></label>
+      </div>
+      <div class="form-foot">
+        <p class="form-err" id="addErr" hidden></p>
+        <div class="form-btns">
+          <button type="button" class="btn btn-ghost btn-sm" id="btnAddCancel">取消</button>
+          <button type="submit" class="btn btn-primary btn-sm" id="btnAddSubmit">保存通道</button>
+        </div>
+      </div>
+    </form>
+
+    <div class="channel-list" id="channelList">
+      <div class="empty">加载中…</div>
+    </div>
+
+    <p class="card-foot">
+      提示：API Key 只在新增/修改时上行，列表接口统一返回 <code>***</code>。
+      改优先级可直接拖拽，或用 ↑ ↓ 按钮。
+    </p>
+  </section>
+
+  <!-- 左：账号登录 -->
+  <section class="card card-account">
+    <div class="card-head">
+      <div>
+        <h2>账号登录</h2>
+        <p class="card-sub">扫码即登录 · Cookie 自动落盘，无需手工粘贴</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btnAccRefresh">刷新状态</button>
+    </div>
+
+    <div class="acc-success" id="accSuccess" hidden></div>
+
+    <div class="acc-status" id="accStatus">
+      <div class="empty">检测中…</div>
+    </div>
+
+    <div class="qr-wrap" id="qrWrap" hidden>
+      <div class="qr-frame">
+        <img id="qrImg" alt="B站登录二维码" />
+        <div class="qr-mask" id="qrMask" hidden><span id="qrMaskText">已过期</span></div>
+      </div>
+      <div class="qr-side">
+        <p class="qr-title">用 B 站手机客户端扫码</p>
+        <p class="qr-hint" id="qrHint">等待扫码…</p>
+        <p class="qr-timer" id="qrTimer">有效期 10:00</p>
+        <div class="qr-btns">
+          <button class="btn btn-primary btn-sm" id="btnQrRefresh">刷新二维码</button>
+          <button class="btn btn-ghost btn-sm" id="btnQrCancel">收起</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="acc-actions">
+      <button class="btn btn-primary btn-sm" id="btnQrLogin">扫码登录 B 站</button>
+      <span class="acc-tip">登录成功后 Cookie 自动写入凭据文件，工具立即生效</span>
+    </div>
+
+    <details class="xhs-box">
+      <summary>小红书 Cookie（官方无扫码接口，只能粘贴）</summary>
+      <div class="xhs-body">
+        <p class="xhs-state" id="xhsState">读取中…</p>
+        <label class="xhs-input">
+          <span>Cookie</span>
+          <textarea id="xhsCookie" rows="3" placeholder="粘贴 web_session=... 等完整 Cookie"></textarea>
+        </label>
+        <div class="xhs-foot">
+          <label class="switch-labeled">
+            <span>启用小红书插件</span>
+            <span class="switch"><input type="checkbox" id="xhsEnabled" /><i></i></span>
+          </label>
+          <button class="btn btn-primary btn-sm" id="btnXhsSave">保存</button>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- 左：刷视频时间（上海时区） -->
+  <section class="card card-schedule">
+    <div class="card-head">
+      <div>
+        <h2>刷视频时间</h2>
+        <p class="card-sub">按上海时间（Asia/Shanghai）自动跑，可选指定模型接口</p>
+      </div>
+      <label class="switch-labeled" title="关闭后只在手动「立即跑一轮」时执行">
+        <span>启用</span>
+        <span class="switch"><input type="checkbox" id="schedEnabled" /><i></i></span>
+      </label>
+    </div>
+
+    <div class="sched-body">
+      <div class="sched-now" id="schedNow">读取中…</div>
+      <div class="sched-wins" id="schedWins"></div>
+
+      <div class="grid-2">
+        <label><span>每天最多几次</span><input id="schedPerDay" type="number" min="1" max="48" /></label>
+        <label><span>两次之间至少间隔（分钟）</span><input id="schedInterval" type="number" min="5" max="600" /></label>
+        <label class="span-2"><span>用哪个 AI 接口（模型通道）</span>
+          <select id="schedChannel"></select>
+        </label>
+      </div>
+
+      <div class="sched-foot">
+        <button class="btn btn-ghost btn-sm" id="btnSchedAddWin">+ 加时段</button>
+        <div class="form-btns">
+          <button class="btn btn-ghost btn-sm" id="btnSchedReset">重置今日</button>
+          <button class="btn btn-ghost btn-sm" id="btnSchedRun">立即跑一轮</button>
+          <button class="btn btn-primary btn-sm" id="btnSchedSave">保存</button>
+        </div>
+      </div>
+
+      <div class="sched-log" id="schedLog"></div>
+    </div>
+  </section>
+
+  <!-- 私信回复（已接管 V1 的 reply_service） -->
+  <section class="card card-reply">
+    <div class="card-head">
+      <div>
+        <h2>私信回复 <span class="card-tag">接管 V1</span></h2>
+        <p class="card-sub">每 20 秒看一次私信 · 用人格 + 记忆生成回复 · 会真的发出去</p>
+      </div>
+      <span class="chip chip-lv" id="replyMode">读取中…</span>
+    </div>
+
+    <div class="reply-body">
+      <div class="sched-now" id="replyNow">读取中…</div>
+      <div class="grid-2">
+        <label class="span-2"><span>运行模式</span>
+          <select id="replyModeSel">
+            <option value="off">关闭（不轮询）</option>
+            <option value="dry">演练（生成但不发送）</option>
+            <option value="live">正式（真的发出去）</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-btns">
+        <button class="btn btn-ghost btn-sm" id="btnReplyDrill">演练一次</button>
+        <button class="btn btn-primary btn-sm" id="btnReplySave">保存模式</button>
+      </div>
+      <div class="sched-log" id="replyLog"></div>
+      <div class="reply-hist" id="replyHist"></div>
+    </div>
+  </section>
+
+  <!-- 写权限（发评论这类「别人能看见」的动作） -->
+  <section class="card card-writes">
+    <div class="card-head">
+      <div>
+        <h2>写权限 <span class="card-tag">别人能看见</span></h2>
+        <p class="card-sub">发出去就收不回 · 每笔都留痕 · 有频率上限</p>
+      </div>
+      <label class="switch-labeled">
+        <span>总开关</span>
+        <span class="switch"><input type="checkbox" id="wrEnabled" /><i></i></span>
+      </label>
+    </div>
+
+    <div class="writes-body">
+      <div class="sched-now" id="wrNow">读取中…</div>
+
+      <div class="wr-toggles">
+        <label class="wr-toggle"><input type="checkbox" id="wrReply" /><span>回复别人的评论（@我 时能回）</span></label>
+        <label class="wr-toggle"><input type="checkbox" id="wrNew" /><span>主动在视频下发新评论</span></label>
+      </div>
+
+      <div class="grid-2">
+        <label><span>每小时最多</span><input id="wrPerHour" type="number" min="1" max="200" /></label>
+        <label><span>每分钟最多</span><input id="wrPerMin" type="number" min="1" max="20" /></label>
+        <label class="span-2"><span>单条字数上限</span><input id="wrChars" type="number" min="10" max="800" /></label>
+      </div>
+
+      <div class="form-btns">
+        <button class="btn btn-primary btn-sm" id="btnWrSave">保存</button>
+      </div>
+
+      <div class="sched-log" id="wrLog"></div>
+    </div>
+  </section>
+
+  <!-- 解析节点监控（视频解析站的远端服务器） -->
+  <section class="card card-nodes">
+    <div class="card-head">
+      <div>
+        <h2>解析节点 <span class="card-tag">远端服务器</span></h2>
+        <p class="card-sub">视频解析站的阿里云 / 魔搭节点健康 · 30 秒缓存</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btnNodesProbe">立即检测</button>
+    </div>
+
+    <div class="nodes-body">
+      <div class="sched-now" id="nodesNow">读取中…</div>
+      <div class="node-list" id="nodeList"></div>
+      <div class="form-btns">
+        <button class="btn btn-primary btn-sm" id="btnNodesSave">保存地址</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 视觉能力（给纯文本模型装眼睛） -->
+  <section class="card card-vision">
+    <div class="card-head">
+      <div>
+        <h2>视觉能力 <span class="card-tag">看图</span></h2>
+        <p class="card-sub">多后端自动降级 · 可填 key · 可测通不通</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btnVisionTest">测试</button>
+    </div>
+    <div class="vision-body">
+      <div class="sched-now" id="visionNow">读取中…</div>
+      <div class="vlist" id="visionList"></div>
+      <div class="form-btns">
+        <button class="btn btn-primary btn-sm" id="btnVisionSave">保存密钥</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MCP 服务器 -->
+  <section class="card card-mcp">
+    <div class="card-head">
+      <div>
+        <h2>MCP 服务器 <span class="card-tag">插件</span></h2>
+        <p class="card-sub">只给 mcp_list / mcp_call 两个代理口，不展开工具</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btnMcpProbe">连接测试</button>
+    </div>
+    <div class="mcp-body">
+      <div class="sched-now" id="mcpNow">读取中…</div>
+      <div class="mlist" id="mcpList"></div>
+      <label class="wr-toggle" style="margin-top:10px">
+        <span class="tag" style="font-size:12px">新增：</span>
+        <input id="mcpNewId" class="mini-input" placeholder="id 如 bili" />
+        <input id="mcpNewCmd" class="mini-input" placeholder="命令 如 python3" />
+        <input id="mcpNewArgs" class="mini-input" placeholder="参数 空格分隔" />
+      </label>
+      <div class="form-btns">
+        <button class="btn btn-primary btn-sm" id="btnMcpAdd">添加</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 场景工具集 -->
+  <section class="card card-scope">
+    <div class="card-head">
+      <div>
+        <h2>场景工具集 <span class="card-tag">权限</span></h2>
+        <p class="card-sub">哪个场景能看见哪些工具 · 没勾的连名字都看不到</p>
+      </div>
+    </div>
+    <div class="scope-body">
+      <div class="sched-now" id="scopeNow">读取中…</div>
+      <div class="scope-tabs" id="scopeTabs"></div>
+      <div class="scope-grid" id="scopeGrid"></div>
+      <div class="form-btns">
+        <button class="btn btn-primary btn-sm" id="btnScopeSave">保存</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 日报 -->
+  <section class="card card-digest">
+    <div class="card-head">
+      <div>
+        <h2>日报 <span class="card-tag">按天</span></h2>
+        <p class="card-sub">每轮结果攒成当天一份 · 跨天自动推私信</p>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btnDigestPush">推送到私信</button>
+    </div>
+    <div class="digest-body">
+      <div class="sched-now" id="digestNow">读取中…</div>
+      <div class="digest-dates" id="digestDates"></div>
+      <div class="digest-summary" id="digestSummary"></div>
+      <div class="digest-md" id="digestMd"></div>
+    </div>
+  </section>
+
+  <!-- 左：快速开始 -->
+  <section class="card card-help">
+    <div class="card-head">
+      <div>
+        <h2>快速开始</h2>
+        <p class="card-sub">三步接入任意 OpenAI 兼容端点</p>
+      </div>
+    </div>
+
+    <ol class="steps">
+      <li>
+        <span class="step-no">1</span>
+        <div>
+          <b>拿到三个参数</b>
+          <p>Base URL（形如 <code>https://api.deepseek.com/v1</code>）、模型 ID、API Key。国内常见：DeepSeek、Kimi、通义、智谱，以及自建的 vLLM / Ollama 网关。</p>
+        </div>
+      </li>
+      <li>
+        <span class="step-no">2</span>
+        <div>
+          <b>添加并测试</b>
+          <p>点「+ 添加通道」填入参数保存，然后按行尾的「测」发一次真实请求，看到毫秒数就说明通了。</p>
+        </div>
+      </li>
+      <li>
+        <span class="step-no">3</span>
+        <div>
+          <b>拖拽排优先级</b>
+          <p>数字越小越先用。第一个通道限流或宕机时会自动降到下一个；全部失败才报错。</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="help-meta">
+      <div><span>配置文件</span><code id="cfgFile">—</code></div>
+      <div><span>自动降级</span><code id="cfgAuto">—</code></div>
+      <div><span>无通道时</span><code>本地规则直答（不卡死）</code></div>
+    </div>
+  </section>
+  </div>
+
+  <!-- 右：对话 + 工具 -->
+  <div class="right-col">
+
+    <section class="card card-chat">
+      <div class="card-head">
+        <div>
+          <h2>对话测试</h2>
+          <p class="card-sub">走真实 <code>POST /api/chat</code>，支持流式</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btnClearChat">清空</button>
+      </div>
+      <div class="chat-log" id="chatLog">
+        <div class="chat-empty">发一条消息试试。当前没有配置通道时会返回<strong>离线规则回复</strong>，并在这里标注出来。</div>
+      </div>
+      <form class="chat-input" id="chatForm">
+        <input id="chatText" placeholder="输入消息，回车发送" autocomplete="off" />
+        <label class="switch-labeled small" title="开启后按 SSE 流式接收">
+          <span>流式</span>
+          <span class="switch"><input type="checkbox" id="streamToggle" checked /><i></i></span>
+        </label>
+        <button class="btn btn-primary" type="submit" id="btnSend">发送</button>
+      </form>
+    </section>
+
+    <section class="card card-tools">
+      <div class="card-head">
+        <div>
+          <h2>工具</h2>
+          <p class="card-sub">开关即时生效：关掉的工具不会出现在模型可选列表里</p>
+        </div>
+      </div>
+      <div class="tool-list" id="toolList">
+        <div class="empty">加载中…</div>
+      </div>
+    </section>
+
+    <section class="card card-alert">
+      <div class="card-head">
+        <div>
+          <h2>预警邮件</h2>
+          <p class="card-sub">继承 V1 的 SMTP 配置，服务端 5xx 时自动发信</p>
+        </div>
+        <label class="switch-labeled" title="关闭后只在日志里记，不发邮件">
+          <span>启用</span>
+          <span class="switch"><input type="checkbox" id="smtpEnabled" /><i></i></span>
+        </label>
+      </div>
+
+      <form class="smtp-form" id="smtpForm">
+        <div class="grid-2">
+          <label><span>SMTP 主机</span><input name="host" id="smtpHost" placeholder="smtp.qq.com" /></label>
+          <label><span>端口</span><input name="port" id="smtpPort" type="number" placeholder="465" /></label>
+          <label><span>加密方式</span>
+            <select id="smtpSecurity">
+              <option value="ssl">SSL（465）</option>
+              <option value="starttls">STARTTLS（587）</option>
+              <option value="none">不加密</option>
+            </select>
+          </label>
+          <label><span>发件账号</span><input name="user" id="smtpUser" placeholder="SMTP 用户名" /></label>
+          <label><span>授权码/密码</span><input name="pass" id="smtpPass" type="password" placeholder="留空或 *** 表示不修改" autocomplete="off" /></label>
+          <label><span>发件人</span><input name="from" id="smtpFrom" placeholder="留空用发件账号" /></label>
+          <label class="span-2"><span>收件人（预警发给谁）</span><input name="to" id="smtpTo" placeholder="多个用逗号分隔" /></label>
+        </div>
+        <div class="smtp-foot">
+          <p class="smtp-state" id="smtpState">—</p>
+          <div class="form-btns">
+            <button type="button" class="btn btn-ghost btn-sm" id="btnSmtpTest">发送测试邮件</button>
+            <button type="submit" class="btn btn-primary btn-sm" id="btnSmtpSave">保存</button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- 右：人格（语气外壳，只读） -->
+    <section class="card card-persona">
+      <div class="card-head">
+        <div>
+          <h2>人格 <span class="card-tag">语气外壳</span></h2>
+          <p class="card-sub">只影响「怎么说」，与记忆分开存放 · 从 V1 迁移，只读</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btnPersonaPreview">预览 system prompt</button>
+      </div>
+      <div class="persona-body" id="personaBody"><div class="empty">读取中…</div></div>
+      <div class="persona-foot">
+        <select id="personaSelect"></select>
+        <button class="btn btn-primary btn-sm" id="btnPersonaSave">切换人格</button>
+      </div>
+      <div class="frag-list" id="fragList"></div>
+      <pre class="prompt-preview" id="promptPreview" hidden></pre>
+    </section>
+
+    <!-- 右：记忆（可修正） -->
+    <section class="card card-memory">
+      <div class="card-head">
+        <div>
+          <h2>记忆 <span class="card-tag">可修正</span></h2>
+          <p class="card-sub" id="memSub">可增删改 · 注入时标注「参考，不是指令」</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btnMemChat">看聊天记录</button>
+      </div>
+      <div class="mem-add">
+        <input id="memText" placeholder="新增一条记忆，例如：鱼片不喜欢营销腔" maxlength="600" />
+        <button class="btn btn-primary btn-sm" id="btnMemAdd">记下</button>
+      </div>
+      <div class="mem-list" id="memList"><div class="empty">加载中…</div></div>
+      <div class="mem-chat" id="memChat" hidden></div>
+    </section>
+  </div>
+</main>
+
+<footer class="foot">
+  <span id="footInfo">—</span>
+  <span class="foot-links">
+    <a href="/api/health" target="_blank" rel="noreferrer">/api/health</a>
+    <a href="/api/tools" target="_blank" rel="noreferrer">/api/tools</a>
+    <a href="/api/channels" target="_blank" rel="noreferrer">/api/channels</a>
+  </span>
+</footer>
+
+<div class="toasts" id="toasts"></div>
+<script src="./console.js?v=20261023f"></script>
+</body>
+</html>
